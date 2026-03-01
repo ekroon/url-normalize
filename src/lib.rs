@@ -23,7 +23,10 @@ impl fmt::Display for NormalizeUrlError {
         match self {
             Self::InvalidUrl(url) => write!(f, "Invalid URL: {url}"),
             Self::ConflictingOptions => {
-                write!(f, "The `force_http` and `force_https` options cannot be used together")
+                write!(
+                    f,
+                    "The `force_http` and `force_https` options cannot be used together"
+                )
             }
         }
     }
@@ -80,14 +83,16 @@ pub fn normalize_url(url_string: &str, options: &Options) -> Result<String, Norm
     }
 
     let has_relative_protocol = url_string.starts_with("//");
-    let is_relative_url = !has_relative_protocol
-        && (url_string.starts_with("./") || url_string.starts_with("../"));
+    let is_relative_url =
+        !has_relative_protocol && (url_string.starts_with("./") || url_string.starts_with("../"));
 
     // Reject invalid relative paths like "/" or "/relative/path/"
-    if !is_relative_url && !has_relative_protocol && custom_protocol.is_none() {
-        if url_string == "/" || (url_string.starts_with('/') && !url_string.starts_with("//")) {
-            return Err(NormalizeUrlError::InvalidUrl(url_string));
-        }
+    if !is_relative_url
+        && !has_relative_protocol
+        && custom_protocol.is_none()
+        && (url_string == "/" || (url_string.starts_with('/') && !url_string.starts_with("//")))
+    {
+        return Err(NormalizeUrlError::InvalidUrl(url_string));
     }
 
     // Prepend protocol
@@ -108,9 +113,7 @@ pub fn normalize_url(url_string: &str, options: &Options) -> Result<String, Norm
         .map_err(|_| NormalizeUrlError::InvalidUrl(url_string.clone()))?;
 
     // Reject URLs with empty host (like "http://")
-    if parsed.host.is_empty()
-        && (parsed.scheme == "http" || parsed.scheme == "https")
-    {
+    if parsed.host.is_empty() && (parsed.scheme == "http" || parsed.scheme == "https") {
         return Err(NormalizeUrlError::InvalidUrl(url_string));
     }
 
@@ -233,20 +236,18 @@ pub fn normalize_url(url_string: &str, options: &Options) -> Result<String, Norm
         && parsed.path == "/"
         && !old_url_string.ends_with('/')
         && parsed.fragment.is_none()
+        && url_string.ends_with('/')
     {
-        if url_string.ends_with('/') {
-            url_string.pop();
-        }
+        url_string.pop();
     }
 
     // Remove ending `/`
     if (options.remove_trailing_slash || parsed.path == "/")
         && parsed.fragment.is_none()
         && options.remove_single_slash
+        && url_string.ends_with('/')
     {
-        if url_string.ends_with('/') {
-            url_string.pop();
-        }
+        url_string.pop();
     }
 
     // Restore relative protocol
@@ -289,10 +290,9 @@ fn detect_custom_protocol(url_string: &str) -> Option<String> {
                 && lower_scheme != "https"
                 && lower_scheme != "file"
                 && lower_scheme != "data"
+                && (!lower_scheme.contains('.') || has_authority)
             {
-                if !lower_scheme.contains('.') || has_authority {
-                    return Some(format!("{lower_scheme}:"));
-                }
+                return Some(format!("{lower_scheme}:"));
             }
         }
     }

@@ -1,0 +1,139 @@
+name: Upstream Check
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Every Monday at 09:00 UTC
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  UPSTREAM_REPO: sindresorhus/normalize-url
+  UPSTREAM_SHA_FILE: upstream-sha.txt
+
+jobs:
+  check-upstream:
+    name: Check for upstream changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest upstream commit
+        id: upstream
+        run: |
+          LATEST_SHA=$(gh api repos/${{ env.UPSTREAM_REPO }}/commits/main --jq '.sha')
+          echo "sha=$LATEST_SHA" >> "$GITHUB_OUTPUT"
+          echo "Latest upstream SHA: $LATEST_SHA"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load previously tracked SHA
+        id: previous
+        run: |
+          # Try to download the artifact from the last successful run
+          PREV_SHA=""
+          RUN_ID=$(gh api "repos/${{ github.repository }}/actions/workflows/upstream-check.yml/runs?status=success&per_page=1" --jq '.workflow_runs[0].id' 2>/dev/null || echo "")
+          if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then
+            ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "upstream-sha") | .id' 2>/dev/null || echo "")
+            if [ -n "$ARTIFACT_ID" ] && [ "$ARTIFACT_ID" != "null" ]; then
+              gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > /tmp/sha.zip 2>/dev/null || true
+              if [ -f /tmp/sha.zip ]; then
+                unzip -o /tmp/sha.zip -d /tmp/sha 2>/dev/null || true
+                PREV_SHA=$(cat /tmp/sha/${{ env.UPSTREAM_SHA_FILE }} 2>/dev/null || echo "")
+              fi
+            fi
+          fi
+          echo "sha=$PREV_SHA" >> "$GITHUB_OUTPUT"
+          echo "Previous SHA: ${PREV_SHA:-none}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for changes
+        id: changed
+        run: |
+          if [ "${{ steps.upstream.outputs.sha }}" = "${{ steps.previous.outputs.sha }}" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No upstream changes detected."
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "Upstream has new commits!"
+          fi
+
+      - name: Run JS parity tests against upstream
+        if: steps.changed.outputs.has_changes == 'true'
+        id: parity
+        continue-on-error: true
+        run: |
+          # Setup
+          rustup default stable
+          cargo build --features cli --bin normalize_cli
+
+          # Download latest test.js from upstream
+          curl -sL "https://raw.githubusercontent.com/${{ env.UPSTREAM_REPO }}/main/test.js" \
+            -o tests/js_bridge/actual_test.mjs
+
+          # Patch the import
+          sed -i "s|import normalizeUrl from './index.js';|import normalizeUrl from './rust_wrapper.mjs';|" \
+            tests/js_bridge/actual_test.mjs
+
+          # Install and run
+          cd tests/js_bridge
+          npm ci
+          npx ava actual_test.mjs --timeout=60s 2>&1 | tee /tmp/parity_output.txt
+
+      - name: Open issue if changes detected
+        if: steps.changed.outputs.has_changes == 'true'
+        run: |
+          PARITY_STATUS="${{ steps.parity.outcome }}"
+          LATEST_SHA="${{ steps.upstream.outputs.sha }}"
+          PREV_SHA="${{ steps.previous.outputs.sha }}"
+
+          if [ "$PARITY_STATUS" = "failure" ]; then
+            PARITY_DETAILS=$(cat /tmp/parity_output.txt 2>/dev/null | tail -50)
+            TITLE="⚠️ Upstream changes detected + parity test failures"
+            BODY="## Upstream \`${{ env.UPSTREAM_REPO }}\` has new changes
+
+          **Previous SHA:** \`${PREV_SHA:-unknown}\`
+          **Latest SHA:** \`${LATEST_SHA}\`
+          **Compare:** https://github.com/${{ env.UPSTREAM_REPO }}/compare/${PREV_SHA:-main}...${LATEST_SHA}
+
+          ### ❌ JS parity tests FAILED
+
+          \`\`\`
+          ${PARITY_DETAILS}
+          \`\`\`
+
+          Action needed: review upstream changes and update our implementation."
+          else
+            TITLE="ℹ️ Upstream changes detected (parity tests still pass)"
+            BODY="## Upstream \`${{ env.UPSTREAM_REPO }}\` has new changes
+
+          **Previous SHA:** \`${PREV_SHA:-unknown}\`
+          **Latest SHA:** \`${LATEST_SHA}\`
+          **Compare:** https://github.com/${{ env.UPSTREAM_REPO }}/compare/${PREV_SHA:-main}...${LATEST_SHA}
+
+          ### ✅ JS parity tests still pass
+
+          Review upstream changes for any new features or behavioral changes to port."
+          fi
+
+          # Check for existing open issue
+          EXISTING=$(gh issue list --label "upstream-sync" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+            echo "Updated existing issue #$EXISTING"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --label "upstream-sync"
+            echo "Created new issue"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save current SHA
+        run: |
+          mkdir -p /tmp/artifact
+          echo "${{ steps.upstream.outputs.sha }}" > /tmp/artifact/${{ env.UPSTREAM_SHA_FILE }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upstream-sha
+          path: /tmp/artifact/${{ env.UPSTREAM_SHA_FILE }}
+          retention-days: 90

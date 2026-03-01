@@ -103,8 +103,11 @@ pub struct Options {
     /// Custom function to transform path components.
     ///
     /// Default: `None`
-    pub transform_path: Option<Box<dyn Fn(Vec<String>) -> Vec<String>>>,
+    pub transform_path: Option<TransformPathFn>,
 }
+
+/// Type alias for the transform_path callback.
+pub type TransformPathFn = Box<dyn Fn(Vec<String>) -> Vec<String>>;
 
 /// Default protocol for URLs without a scheme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

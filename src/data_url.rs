@@ -81,16 +81,13 @@ pub fn normalize_data_url(url_string: &str, strip_hash: bool) -> Result<String, 
         normalized_media_type.push("base64".to_string());
     }
 
-    if !normalized_media_type.is_empty()
-        || (!mime_type.is_empty() && mime_type != "text/plain")
-    {
+    if !normalized_media_type.is_empty() || (!mime_type.is_empty() && mime_type != "text/plain") {
         normalized_media_type.insert(0, mime_type.clone());
     }
 
-    let hash_part = if strip_hash || hash.is_none() {
-        String::new()
-    } else {
-        format!("#{}", hash.unwrap())
+    let hash_part = match hash {
+        Some(h) if !strip_hash => format!("#{h}"),
+        _ => String::new(),
     };
 
     let data_part = if is_base64 { data.trim() } else { data };
@@ -127,15 +124,13 @@ mod tests {
 
     #[test]
     fn test_charset_lowercase() {
-        let result =
-            normalize_data_url("data:text/plain;charset=UTF-8,hello", false).unwrap();
+        let result = normalize_data_url("data:text/plain;charset=UTF-8,hello", false).unwrap();
         assert_eq!(result, "data:text/plain;charset=utf-8,hello");
     }
 
     #[test]
     fn test_default_charset_removal() {
-        let result =
-            normalize_data_url("data:text/plain;charset=us-ascii,hello", false).unwrap();
+        let result = normalize_data_url("data:text/plain;charset=us-ascii,hello", false).unwrap();
         // default MIME type text/plain is removed, default charset us-ascii is removed
         assert_eq!(result, "data:,hello");
     }
@@ -148,15 +143,13 @@ mod tests {
 
     #[test]
     fn test_strip_hash() {
-        let result =
-            normalize_data_url("data:text/html,hello#fragment", true).unwrap();
+        let result = normalize_data_url("data:text/html,hello#fragment", true).unwrap();
         assert_eq!(result, "data:text/html,hello");
     }
 
     #[test]
     fn test_preserve_hash() {
-        let result =
-            normalize_data_url("data:text/html,hello#fragment", false).unwrap();
+        let result = normalize_data_url("data:text/html,hello#fragment", false).unwrap();
         assert_eq!(result, "data:text/html,hello#fragment");
     }
 }

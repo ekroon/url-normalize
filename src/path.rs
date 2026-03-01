@@ -71,7 +71,9 @@ pub fn remove_directory_index(path: &mut String, option: &RemoveDirectoryIndex) 
             // Use inline check: matches "index." followed by lowercase letters
             let components: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
             if let Some(last) = components.last() {
-                if last.starts_with("index.") && last.len() > 6 && last[6..].bytes().all(|b| b.is_ascii_lowercase())
+                if last.starts_with("index.")
+                    && last.len() > 6
+                    && last[6..].bytes().all(|b| b.is_ascii_lowercase())
                 {
                     let new_components = components[..components.len() - 1].to_vec();
                     if new_components.is_empty() {

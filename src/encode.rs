@@ -8,10 +8,7 @@ pub fn percent_decode(input: &str) -> String {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let (Some(hi), Some(lo)) = (
-                hex_digit(bytes[i + 1]),
-                hex_digit(bytes[i + 2]),
-            ) {
+            if let (Some(hi), Some(lo)) = (hex_digit(bytes[i + 1]), hex_digit(bytes[i + 2])) {
                 let byte_val = (hi << 4) | lo;
                 result.push(byte_val);
                 i += 3;
@@ -82,7 +79,10 @@ fn flush_pct_bytes(pct_bytes: &[u8], result: &mut String) {
 
 /// Characters that JS decodeURI() does NOT decode (keeps them percent-encoded).
 fn is_uri_reserved(b: u8) -> bool {
-    matches!(b, b';' | b'/' | b'?' | b':' | b'@' | b'&' | b'=' | b'+' | b'$' | b',' | b'#')
+    matches!(
+        b,
+        b';' | b'/' | b'?' | b':' | b'@' | b'&' | b'=' | b'+' | b'$' | b',' | b'#'
+    )
 }
 
 /// Percent-encode a byte as `%XX` (uppercase hex).
@@ -140,6 +140,6 @@ mod tests {
 
     #[test]
     fn test_percent_encode() {
-        assert_eq!(percent_encode("hello world", &[b' ']), "hello%20world");
+        assert_eq!(percent_encode("hello world", b" "), "hello%20world");
     }
 }

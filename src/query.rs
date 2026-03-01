@@ -5,9 +5,8 @@ use std::collections::HashSet;
 /// Encoded reserved characters that need special handling during sort.
 /// These are: : / ? # [ ] @ ! $ & ' ( ) * + , ; =
 const ENCODED_RESERVED: &[&str] = &[
-    "%3A", "%2F", "%3F", "%23", "%5B", "%5D", "%40",
-    "%21", "%24", "%26", "%27", "%28", "%29", "%2A",
-    "%2B", "%2C", "%3B", "%3D",
+    "%3A", "%2F", "%3F", "%23", "%5B", "%5D", "%40", "%21", "%24", "%26", "%27", "%28", "%29",
+    "%2A", "%2B", "%2C", "%3B", "%3D",
 ];
 
 /// A parsed query parameter preserving its original format.
@@ -251,7 +250,12 @@ pub fn process_query(parsed: &mut ParsedUrl, options: &Options, original_query: 
 
     // Normalize empty query values
     let original = original_query.unwrap_or("");
-    normalize_empty_values(&mut params, options.empty_query_value, original, &token_prefix);
+    normalize_empty_values(
+        &mut params,
+        options.empty_query_value,
+        original,
+        &token_prefix,
+    );
 
     // Normalize + to %20 in keys
     for p in &mut params {
@@ -284,7 +288,11 @@ fn encode_query_component(s: &str, is_value: bool) -> String {
     while i < bytes.len() {
         let b = bytes[i];
         // Handle percent-encoded sequences
-        if b == b'%' && i + 2 < bytes.len() && bytes[i + 1].is_ascii_hexdigit() && bytes[i + 2].is_ascii_hexdigit() {
+        if b == b'%'
+            && i + 2 < bytes.len()
+            && bytes[i + 1].is_ascii_hexdigit()
+            && bytes[i + 2].is_ascii_hexdigit()
+        {
             let hi = hex_val(bytes[i + 1]);
             let lo = hex_val(bytes[i + 2]);
             let decoded_byte = (hi << 4) | lo;
@@ -307,13 +315,18 @@ fn encode_query_component(s: &str, is_value: bool) -> String {
                 // Non-ASCII: collect consecutive percent-encoded bytes for UTF-8 validation
                 let mut pct_bytes = vec![decoded_byte];
                 let mut j = i + 3;
-                while j < bytes.len() && bytes[j] == b'%' && j + 2 < bytes.len()
-                    && bytes[j + 1].is_ascii_hexdigit() && bytes[j + 2].is_ascii_hexdigit()
+                while j < bytes.len()
+                    && bytes[j] == b'%'
+                    && j + 2 < bytes.len()
+                    && bytes[j + 1].is_ascii_hexdigit()
+                    && bytes[j + 2].is_ascii_hexdigit()
                 {
                     let h = hex_val(bytes[j + 1]);
                     let l = hex_val(bytes[j + 2]);
                     let db = (h << 4) | l;
-                    if db < 0x80 { break; } // Stop at ASCII
+                    if db < 0x80 {
+                        break;
+                    } // Stop at ASCII
                     pct_bytes.push(db);
                     j += 3;
                 }
@@ -385,7 +398,11 @@ fn hex_val(b: u8) -> u8 {
 }
 
 fn to_hex_upper(nibble: u8) -> char {
-    if nibble < 10 { (b'0' + nibble) as char } else { (b'A' + nibble - 10) as char }
+    if nibble < 10 {
+        (b'0' + nibble) as char
+    } else {
+        (b'A' + nibble - 10) as char
+    }
 }
 
 /// Characters that URLSearchParams does NOT encode (the form-urlencoded safe set).

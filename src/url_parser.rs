@@ -59,7 +59,7 @@ impl ParsedUrl {
 
         // Split authority from path (backslash counts as path separator)
         let (authority, path) = {
-            let first_sep = rest.find(|c: char| c == '/' || c == '\\');
+            let first_sep = rest.find(['/', '\\']);
             if let Some(sep_idx) = first_sep {
                 (&rest[..sep_idx], rest[sep_idx..].replace('\\', "/"))
             } else {

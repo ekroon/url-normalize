@@ -7,8 +7,8 @@
 //! Output format (one JSON per line):
 //!   {"ok": "normalized_url"} or {"err": "error message"}
 
-use url_normalize::*;
 use std::io::{self, BufRead, Write};
+use url_normalize::*;
 
 fn main() {
     let stdin = io::stdin();
@@ -44,12 +44,11 @@ fn main() {
             }
             Err(e) => {
                 // Use JS-style option names in error messages for test compatibility
-                let msg = e.to_string().replace("force_http", "forceHttp").replace("force_https", "forceHttps");
-                let _ = writeln!(
-                    out,
-                    r#"{{"err":{}}}"#,
-                    serde_json::to_string(&msg).unwrap()
-                );
+                let msg = e
+                    .to_string()
+                    .replace("force_http", "forceHttp")
+                    .replace("force_https", "forceHttps");
+                let _ = writeln!(out, r#"{{"err":{}}}"#, serde_json::to_string(&msg).unwrap());
             }
         }
     }
@@ -94,12 +93,8 @@ fn simple_regex_match(input: &str, pattern: &str, case_insensitive: bool) -> boo
     let anchored_start = expanded.starts_with('^');
     let anchored_end = expanded.ends_with('$') && !expanded.ends_with("\\$");
 
-    let core = expanded
-        .strip_prefix('^')
-        .unwrap_or(&expanded);
-    let core = core
-        .strip_suffix('$')
-        .unwrap_or(core);
+    let core = expanded.strip_prefix('^').unwrap_or(&expanded);
+    let core = core.strip_suffix('$').unwrap_or(core);
 
     if anchored_start && anchored_end {
         regex_core_match(inp, core)
@@ -145,7 +140,11 @@ fn regex_core_match_suffix(input: &str, core: &str) -> bool {
 /// Recursive regex matcher for simple patterns.
 fn regex_core_match_inner(input: &str, pattern: &str, must_consume_all: bool) -> bool {
     if pattern.is_empty() {
-        return if must_consume_all { input.is_empty() } else { true };
+        return if must_consume_all {
+            input.is_empty()
+        } else {
+            true
+        };
     }
 
     let pat_bytes = pattern.as_bytes();
@@ -161,7 +160,10 @@ fn regex_core_match_inner(input: &str, pattern: &str, must_consume_all: bool) ->
                 if rest_pat.starts_with('+') {
                     // \w+ : match one or more word chars (greedy)
                     let rest_pat = &rest_pat[1..];
-                    let word_len = input.bytes().take_while(|b| b.is_ascii_alphanumeric() || *b == b'_').count();
+                    let word_len = input
+                        .bytes()
+                        .take_while(|b| b.is_ascii_alphanumeric() || *b == b'_')
+                        .count();
                     if word_len == 0 {
                         return false;
                     }
@@ -218,7 +220,10 @@ fn regex_core_match_inner(input: &str, pattern: &str, must_consume_all: bool) ->
                 if char_class_matches(first, class_content) {
                     if is_plus {
                         // Greedy match
-                        let match_len = input.bytes().take_while(|b| char_class_matches(*b, class_content)).count();
+                        let match_len = input
+                            .bytes()
+                            .take_while(|b| char_class_matches(*b, class_content))
+                            .count();
                         for len in (1..=match_len).rev() {
                             if regex_core_match_inner(&input[len..], rest_pat, must_consume_all) {
                                 return true;
@@ -386,21 +391,35 @@ fn parse_transform_path(src: &str) -> Box<dyn Fn(Vec<String>) -> Vec<String>> {
     let src = src.trim();
 
     // "() => []" or "() => null" or "() => undefined"
-    if src.starts_with("()") && (src.contains("=> []") || src.contains("=> null") || src.contains("=> undefined")) {
+    if src.starts_with("()")
+        && (src.contains("=> []") || src.contains("=> null") || src.contains("=> undefined"))
+    {
         return Box::new(|_: Vec<String>| vec![]);
     }
 
     // "pathComponents => { if (pathComponents[0] === 'api') { return pathComponents.slice(0, 1); } return []; }"
-    if src.contains("if (") && src.contains("[0] ===") && src.contains(".slice(") && src.contains("return []") {
+    if src.contains("if (")
+        && src.contains("[0] ===")
+        && src.contains(".slice(")
+        && src.contains("return []")
+    {
         // Extract the condition value and slice args
-        if let (Some(cond_val), Some(slice_args)) = (extract_if_condition_value(src), extract_slice_args(src)) {
+        if let (Some(cond_val), Some(slice_args)) =
+            (extract_if_condition_value(src), extract_slice_args(src))
+        {
             let (start, end) = slice_args;
             return Box::new(move |components: Vec<String>| {
                 if components.first().map(|s| s.as_str()) == Some(cond_val.as_str()) {
                     let len = components.len() as i64;
                     let s = normalize_index(start, len);
-                    let e = if let Some(e) = end { normalize_index(e, len) } else { len as usize };
-                    if s >= e { return vec![]; }
+                    let e = if let Some(e) = end {
+                        normalize_index(e, len)
+                    } else {
+                        len as usize
+                    };
+                    if s >= e {
+                        return vec![];
+                    }
                     components[s..e].to_vec()
                 } else {
                     vec![]
@@ -416,8 +435,14 @@ fn parse_transform_path(src: &str) -> Box<dyn Fn(Vec<String>) -> Vec<String>> {
             return Box::new(move |components: Vec<String>| {
                 let len = components.len() as i64;
                 let s = normalize_index(start, len);
-                let e = if let Some(e) = end { normalize_index(e, len) } else { len as usize };
-                if s >= e { return vec![]; }
+                let e = if let Some(e) = end {
+                    normalize_index(e, len)
+                } else {
+                    len as usize
+                };
+                if s >= e {
+                    return vec![];
+                }
                 components[s..e].to_vec()
             });
         }
@@ -484,7 +509,9 @@ fn extract_filter_exclude(src: &str) -> Option<String> {
     let idx = src.find("!==")?;
     let after = src[idx + 3..].trim();
     let quote = after.chars().next()?;
-    if quote != '\'' && quote != '"' { return None; }
+    if quote != '\'' && quote != '"' {
+        return None;
+    }
     let end = after[1..].find(quote)?;
     Some(after[1..1 + end].to_string())
 }
@@ -513,7 +540,9 @@ fn extract_array_literal(src: &str) -> Option<Vec<String>> {
         .split(',')
         .filter_map(|s| {
             let s = s.trim();
-            if (s.starts_with('\'') && s.ends_with('\'')) || (s.starts_with('"') && s.ends_with('"')) {
+            if (s.starts_with('\'') && s.ends_with('\''))
+                || (s.starts_with('"') && s.ends_with('"'))
+            {
                 Some(s[1..s.len() - 1].to_string())
             } else {
                 None
