@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "normalize-url": "^9.0.0"
+  },
+  "devDependencies": {
+    "ava": "^7.0.0"
+  }
+}

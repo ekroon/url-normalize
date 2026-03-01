@@ -1,0 +1,22 @@
+[package]
+name = "url-normalize"
+version = "0.1.0"
+edition = "2021"
+description = "Normalize a URL — faithful Rust port of sindresorhus/normalize-url"
+license = "MIT"
+keywords = ["url", "normalize", "normalization", "sanitize"]
+categories = ["web-programming"]
+repository = "https://github.com/ekroon/url-normalize"
+homepage = "https://github.com/ekroon/url-normalize"
+readme = "README.md"
+
+[dependencies]
+idna = "1"
+serde_json = { version = "1", optional = true }
+
+[features]
+cli = ["serde_json"]
+
+[[bin]]
+name = "normalize_cli"
+required-features = ["cli"]
