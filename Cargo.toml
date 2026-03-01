@@ -2,7 +2,7 @@
 name = "url-normalize"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.82"
 description = "Normalize a URL — faithful Rust port of sindresorhus/normalize-url"
 license = "MIT"
 keywords = ["url", "normalize", "normalization", "sanitize"]
