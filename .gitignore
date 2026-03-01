@@ -1,2 +1,3 @@
 /target
 tests/js_bridge/node_modules/
+Cargo.lock
