@@ -1,6 +1,6 @@
 [package]
 name = "url-normalize"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.83"
 description = "Normalize a URL — faithful Rust port of sindresorhus/normalize-url"
